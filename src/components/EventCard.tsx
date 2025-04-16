@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { Video, Clock, User } from 'lucide-react';
+import { Video, Clock, User, Copy, Check } from 'lucide-react';
 import { ScheduleEvent } from '@/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
 
 interface EventCardProps {
   event: ScheduleEvent;
@@ -17,8 +18,25 @@ const EventCard: React.FC<EventCardProps> = ({
   isTeacherView = false,
   onClick
 }) => {
+  const [isCopied, setIsCopied] = useState(false);
+  const { toast } = useToast();
+  
   const formattedStartTime = format(new Date(event.startDateTime), 'h:mm a');
   const formattedEndTime = format(new Date(event.endDateTime), 'h:mm a');
+  
+  const copyMeetLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(event.meetLink);
+    setIsCopied(true);
+    toast({
+      title: "Link copied",
+      description: "Google Meet link has been copied to clipboard",
+    });
+    
+    setTimeout(() => {
+      setIsCopied(false);
+    }, 2000);
+  };
   
   return (
     <div 
@@ -45,11 +63,11 @@ const EventCard: React.FC<EventCardProps> = ({
       </div>
       
       {!isTeacherView && (
-        <div className="mt-3">
+        <div className="mt-3 flex space-x-2">
           <Button
             variant="outline" 
             size="sm"
-            className="w-full text-google-blue border-google-blue hover:bg-google-blue/10"
+            className="flex-grow text-google-blue border-google-blue hover:bg-google-blue/10"
             onClick={(e) => {
               e.stopPropagation();
               window.open(event.meetLink, '_blank');
@@ -57,6 +75,15 @@ const EventCard: React.FC<EventCardProps> = ({
           >
             <Video className="w-4 h-4 mr-2" />
             Join Meeting
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 border-google-blue text-google-blue hover:bg-google-blue/10"
+            onClick={copyMeetLink}
+          >
+            {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           </Button>
         </div>
       )}

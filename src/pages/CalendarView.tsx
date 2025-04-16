@@ -10,6 +10,7 @@ import { ScheduleEvent, Teacher, ViewMode } from '@/types';
 import { generateCalendarDays, generateWeekDays, getEventsForDate, getTeacherColor, sortEventsByTime } from '@/utils/calendarUtils';
 import EventCard from '@/components/EventCard';
 import ScheduleModal from '@/components/ScheduleModal';
+import ViewEventModal from '@/components/ViewEventModal';
 
 interface CalendarViewProps {
   events: ScheduleEvent[];
@@ -30,6 +31,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'add' | 'view'>('add');
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   const monthDays = generateCalendarDays(currentDate);
   const weekDays = generateWeekDays(currentDate);
@@ -51,8 +53,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 
   const handleEventClick = (event: ScheduleEvent) => {
     setSelectedEvent(event);
-    setModalType('view');
-    setIsModalOpen(true);
+    
+    if (isTeacherView) {
+      setModalType('view');
+      setIsModalOpen(true);
+    } else {
+      setIsViewModalOpen(true);
+    }
   };
 
   const handleAddEvent = (event: Partial<ScheduleEvent>) => {
@@ -289,6 +296,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         {viewMode === ViewMode.DAY && renderDayView()}
       </Card>
 
+      {/* Teacher modal for adding/editing events */}
       {isTeacherView && teacher && isModalOpen && (
         <ScheduleModal
           isOpen={isModalOpen}
@@ -301,18 +309,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         />
       )}
       
-      {!isTeacherView && isModalOpen && selectedEvent && (
-        <ScheduleModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSave={() => {}}
-          teacher={{
-            id: selectedEvent.teacherId,
-            name: selectedEvent.teacherName,
-            email: ''
-          }}
-          editEvent={selectedEvent}
-          isViewOnly={true}
+      {/* Student view modal */}
+      {!isTeacherView && isViewModalOpen && selectedEvent && (
+        <ViewEventModal
+          isOpen={isViewModalOpen}
+          onClose={() => setIsViewModalOpen(false)}
+          event={selectedEvent}
         />
       )}
     </div>

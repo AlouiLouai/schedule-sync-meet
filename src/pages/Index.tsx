@@ -3,16 +3,32 @@ import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import CalendarView from './CalendarView';
 import { ScheduleEvent } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CalendarIcon } from 'lucide-react';
 
 const Index: React.FC = () => {
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Load all events from localStorage
   useEffect(() => {
+    setLoading(true);
     const storedEvents = localStorage.getItem('scheduleEvents');
     if (storedEvents) {
-      setEvents(JSON.parse(storedEvents));
+      try {
+        const parsedEvents = JSON.parse(storedEvents);
+        // Convert string dates to Date objects
+        const processedEvents = parsedEvents.map((event: any) => ({
+          ...event,
+          startDateTime: new Date(event.startDateTime),
+          endDateTime: new Date(event.endDateTime)
+        }));
+        setEvents(processedEvents);
+      } catch (error) {
+        console.error('Error parsing events:', error);
+      }
     }
+    setLoading(false);
   }, []);
 
   return (
@@ -28,11 +44,17 @@ const Index: React.FC = () => {
             </p>
           </div>
           
-          {events.length > 0 ? (
+          {loading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-64 mb-6" />
+              <Skeleton className="h-[500px] w-full rounded-md" />
+            </div>
+          ) : events.length > 0 ? (
             <CalendarView events={events} />
           ) : (
-            <div className="text-center py-16">
-              <h2 className="text-xl text-google-gray font-medium mb-2">No scheduled events yet</h2>
+            <div className="text-center py-16 bg-white rounded-lg shadow-sm">
+              <CalendarIcon className="mx-auto h-12 w-12 text-google-gray mb-4" />
+              <h2 className="text-xl text-google-dark-gray font-medium mb-2">No scheduled events yet</h2>
               <p className="text-google-gray">
                 Check back later or ask your teachers to add their schedules
               </p>

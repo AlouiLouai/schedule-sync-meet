@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Clock } from 'lucide-react';
+import { CalendarIcon, Clock, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScheduleEvent, Teacher } from '@/types';
 import { generateMeetLink } from '@/utils/calendarUtils';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ScheduleModalProps {
   isOpen: boolean;
@@ -35,17 +36,17 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>(selectedDate);
-  const [endDate, setEndDate] = useState<Date | undefined>(selectedDate);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
   const [meetLink, setMeetLink] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (editEvent) {
       setTitle(editEvent.title);
       setDescription(editEvent.description);
       setStartDate(new Date(editEvent.startDateTime));
-      setEndDate(new Date(editEvent.endDateTime));
       setStartTime(format(new Date(editEvent.startDateTime), 'HH:mm'));
       setEndTime(format(new Date(editEvent.endDateTime), 'HH:mm'));
       setMeetLink(editEvent.meetLink);
@@ -53,7 +54,6 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       setTitle('');
       setDescription('');
       setStartDate(selectedDate);
-      setEndDate(selectedDate);
       setStartTime('09:00');
       setEndTime('10:00');
       setMeetLink(generateMeetLink());
@@ -61,13 +61,13 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   }, [editEvent, selectedDate, isOpen]);
 
   const handleSave = () => {
-    if (!startDate || !endDate || !title) return;
+    if (!startDate || !title) return;
 
     const startDateTime = new Date(startDate);
     const [startHours, startMinutes] = startTime.split(':').map(Number);
     startDateTime.setHours(startHours, startMinutes);
 
-    const endDateTime = new Date(endDate);
+    const endDateTime = new Date(startDate); // Same date for end
     const [endHours, endMinutes] = endTime.split(':').map(Number);
     endDateTime.setHours(endHours, endMinutes);
 
@@ -85,13 +85,26 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     onClose();
   };
 
+  const copyMeetLink = () => {
+    navigator.clipboard.writeText(meetLink);
+    setIsCopied(true);
+    toast({
+      title: "Link copied",
+      description: "Google Meet link has been copied to clipboard",
+    });
+    
+    setTimeout(() => {
+      setIsCopied(false);
+    }, 2000);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
             {isViewOnly 
-              ? 'View Schedule' 
+              ? 'Class Details' 
               : editEvent 
                 ? 'Edit Schedule' 
                 : 'Add New Schedule'}
@@ -121,35 +134,35 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>Start Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      isViewOnly && "bg-gray-100"
-                    )}
-                    disabled={isViewOnly}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          <div className="grid gap-2">
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    isViewOnly && "bg-gray-100"
+                  )}
+                  disabled={isViewOnly}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={setStartDate}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
 
+          <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="startTime">Start Time</Label>
               <div className="flex items-center">
@@ -163,36 +176,6 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   className={isViewOnly ? "bg-gray-100" : ""}
                 />
               </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      isViewOnly && "bg-gray-100"
-                    )}
-                    disabled={isViewOnly}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
             </div>
 
             <div className="grid gap-2">
@@ -213,12 +196,22 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
           <div className="grid gap-2">
             <Label htmlFor="meetLink">Google Meet Link</Label>
-            <Input
-              id="meetLink"
-              value={meetLink}
-              readOnly
-              className="bg-gray-100"
-            />
+            <div className="flex items-center">
+              <Input
+                id="meetLink"
+                value={meetLink}
+                readOnly
+                className="bg-gray-100 flex-1"
+              />
+              <Button 
+                size="icon" 
+                variant="outline" 
+                className="ml-2" 
+                onClick={copyMeetLink}
+              >
+                {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </div>
 
