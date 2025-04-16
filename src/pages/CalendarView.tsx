@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { ScheduleEvent, Teacher, ViewMode } from '@/types';
 import { generateCalendarDays, generateWeekDays, getEventsForDate, getTeacherColor, sortEventsByTime } from '@/utils/calendarUtils';
 import EventCard from '@/components/EventCard';
-import ScheduleModal from '@/components/ScheduleModal';
+import ScheduleModal from '@/components/schedule-modal/ScheduleModal';
 import ViewEventModal from '@/components/ViewEventModal';
 
 interface CalendarViewProps {
