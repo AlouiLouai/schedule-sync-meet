@@ -15,6 +15,7 @@ export interface ScheduleEvent {
   meetLink: string;
   teacherId: string;
   teacherName: string;
+  teacherPhotoUrl?: string;
   color?: string;
 }
 
@@ -23,3 +24,4 @@ export enum ViewMode {
   WEEK = 'week',
   MONTH = 'month'
 }
+

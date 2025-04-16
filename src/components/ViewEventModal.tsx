@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Copy, Check, Video, Clock, User, CalendarIcon } from 'lucide-react';
 import { ScheduleEvent } from '@/types';
 import { useToast } from '@/components/ui/use-toast';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface ViewEventModalProps {
   isOpen: boolean;
@@ -46,7 +47,16 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{event.title}</DialogTitle>
+          <div className="flex items-center space-x-3">
+            <Avatar className="w-10 h-10">
+              <AvatarImage 
+                src={event.teacherPhotoUrl || '/placeholder.svg'} 
+                alt={`${event.teacherName}'s avatar`} 
+              />
+              <AvatarFallback>{event.teacherName.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <DialogTitle>{event.title}</DialogTitle>
+          </div>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
@@ -106,3 +116,4 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
 };
 
 export default ViewEventModal;
+

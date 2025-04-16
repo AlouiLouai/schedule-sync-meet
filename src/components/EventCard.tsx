@@ -6,6 +6,7 @@ import { ScheduleEvent } from '@/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface EventCardProps {
   event: ScheduleEvent;
@@ -48,7 +49,16 @@ const EventCard: React.FC<EventCardProps> = ({
       style={{ borderLeftColor: event.color || '#4285F4' }}
       onClick={onClick}
     >
-      <h3 className="font-medium text-google-dark-gray line-clamp-1">{event.title}</h3>
+      <div className="flex items-center space-x-3 mb-2">
+        <Avatar className="w-8 h-8">
+          <AvatarImage 
+            src={event.teacherPhotoUrl || '/placeholder.svg'} 
+            alt={`${event.teacherName}'s avatar`} 
+          />
+          <AvatarFallback>{event.teacherName.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <h3 className="font-medium text-google-dark-gray line-clamp-1">{event.title}</h3>
+      </div>
       
       <div className="mt-2 space-y-1">
         <div className="flex items-center text-sm text-google-gray">
@@ -92,3 +102,4 @@ const EventCard: React.FC<EventCardProps> = ({
 };
 
 export default EventCard;
+
