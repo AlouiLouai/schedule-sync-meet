@@ -36,27 +36,41 @@ const TeacherLogin: React.FC = () => {
     };
 
     const initializeGoogleAuth = () => {
-      window.google?.accounts.id.initialize({
-        client_id: '377859050326-99n84huq8lkvkf12tuohg70lcd5qm4sg.apps.googleusercontent.com', // This is a placeholder client ID
-        callback: handleGoogleResponse,
-        auto_select: false,
-      });
-      setIsInitializing(false);
+      // Check if Google One Tap API is loaded properly
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          // Real Google Client ID - you need to replace this with your actual Google OAuth client ID
+          client_id: '377859050326-99n84huq8lkvkf12tuohg70lcd5qm4sg.apps.googleusercontent.com',
+          callback: handleGoogleResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        
+        setIsInitializing(false);
+      } else {
+        console.error('Google One Tap API failed to load properly');
+        setIsInitializing(false);
+      }
     };
 
     loadGoogleScript();
 
     return () => {
-      // Cleanup if needed
+      // Cleanup function to cancel any Google API processes when component unmounts
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.cancel();
+      }
     };
   }, []);
 
   const handleGoogleResponse = (response: any) => {
+    console.log('Google response received:', response);
     setLoading(true);
     
     try {
       // Decode the JWT token to get user information
       const payload = decodeJwtResponse(response.credential);
+      console.log('Decoded payload:', payload);
       
       // In a real application, we would validate this user against our database
       // For this demo, we'll check if the email matches any of our allowed teachers
@@ -104,22 +118,44 @@ const TeacherLogin: React.FC = () => {
   };
 
   const decodeJwtResponse = (token: string) => {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Error decoding JWT:', error);
+      throw new Error('Failed to decode authentication token');
+    }
   };
 
   const handleLoginClick = () => {
+    setLoading(true);
+    
     if (window.google?.accounts.id) {
-      window.google.accounts.id.prompt();
+      // Show the Google One Tap prompt
+      try {
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.log('Google One Tap was not displayed:', notification);
+            // Fallback to the demo login if Google One Tap fails
+            handleDemoLogin();
+          } else {
+            setLoading(false);
+          }
+        });
+      } catch (error) {
+        console.error('Error with Google prompt:', error);
+        handleDemoLogin();
+      }
     } else {
       // Fallback for when Google API doesn't load properly
+      console.warn('Google authentication not available, falling back to demo login');
       handleDemoLogin();
     }
   };
@@ -202,7 +238,12 @@ declare global {
       accounts: {
         id: {
           initialize: (params: any) => void;
-          prompt: (params?: any) => void;
+          prompt: (callback?: (notification: any) => void) => void;
+          renderButton: (element: HTMLElement, options: any) => void;
+          disableAutoSelect: () => void;
+          storeCredential: (credential: any, callback: () => void) => void;
+          cancel: () => void;
+          revoke: (email: string, callback: () => void) => void;
         };
       };
     };
