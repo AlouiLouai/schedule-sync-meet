@@ -7,17 +7,18 @@ import Header from '@/components/Header';
 import CalendarView from './CalendarView';
 import { ScheduleEvent, Teacher } from '@/types';
 import { getTeacherColor } from '@/utils/calendarUtils';
+import { getEvents, createEvent, updateEvent } from '@/utils/supabaseClient';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const TeacherDashboard: React.FC = () => {
   const [teacher, setTeacher] = useState<Teacher | null>(null);
-  const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  // Load teacher info and events from localStorage
+  // Load teacher info from localStorage
   useEffect(() => {
     const storedTeacher = localStorage.getItem('teacherInfo');
-    const storedEvents = localStorage.getItem('scheduleEvents');
     
     if (storedTeacher) {
       setTeacher(JSON.parse(storedTeacher));
@@ -25,14 +26,38 @@ const TeacherDashboard: React.FC = () => {
       // No teacher info found, redirect to login
       navigate('/teacher-login');
     }
-    
-    if (storedEvents) {
-      setEvents(JSON.parse(storedEvents));
-    }
   }, [navigate]);
+
+  // Fetch events for this teacher
+  const { data: allEvents = [], isLoading } = useQuery({
+    queryKey: ['events'],
+    queryFn: getEvents,
+    enabled: !!teacher // Only run query when teacher is loaded
+  });
+
+  // Filter events to show only this teacher's events
+  const teacherEvents = teacher
+    ? allEvents.filter(event => event.teacherId === teacher.id)
+    : [];
+
+  // Mutations for creating and updating events
+  const createEventMutation = useMutation({
+    mutationFn: createEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    }
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: updateEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    }
+  });
 
   const handleLogout = () => {
     localStorage.removeItem('teacherInfo');
+    localStorage.removeItem('googleAuthCredentials');
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out.",
@@ -40,37 +65,60 @@ const TeacherDashboard: React.FC = () => {
     navigate('/');
   };
 
-  const handleAddEvent = (event: Partial<ScheduleEvent>) => {
+  const handleAddEvent = async (event: Partial<ScheduleEvent>) => {
     if (!teacher) return;
     
     // Create a new event with color based on teacher ID
-    const newEvent: ScheduleEvent = {
-      ...event as ScheduleEvent,
-      color: getTeacherColor(teacher.id)
+    const newEvent: Partial<ScheduleEvent> = {
+      ...event,
+      color: getTeacherColor(teacher.id),
+      teacherPhotoUrl: teacher.photoUrl
     };
     
-    // Add new event or update existing one
-    const updatedEvents = events.some(e => e.id === newEvent.id)
-      ? events.map(e => e.id === newEvent.id ? newEvent : e)
-      : [...events, newEvent];
-    
-    // Update state and localStorage
-    setEvents(updatedEvents);
-    localStorage.setItem('scheduleEvents', JSON.stringify(updatedEvents));
-    
-    toast({
-      title: event.id ? "Schedule Updated" : "Schedule Created",
-      description: `Your ${event.title} schedule has been ${event.id ? "updated" : "added"}.`,
-    });
+    try {
+      // Add new event or update existing one
+      if (event.id && allEvents.some(e => e.id === event.id)) {
+        await updateEventMutation.mutateAsync(newEvent);
+        toast({
+          title: "Schedule Updated",
+          description: `Your ${event.title} schedule has been updated.`,
+        });
+      } else {
+        await createEventMutation.mutateAsync(newEvent);
+        toast({
+          title: "Schedule Created",
+          description: `Your ${event.title} schedule has been added.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error saving event:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save your schedule. Please try again.",
+        variant: "destructive"
+      });
+      
+      // Fallback to localStorage if database fails
+      const storedEvents = localStorage.getItem('scheduleEvents') || '[]';
+      let events = JSON.parse(storedEvents);
+      
+      events = event.id
+        ? events.map((e: ScheduleEvent) => e.id === event.id ? newEvent : e)
+        : [...events, { ...newEvent, id: Math.random().toString(36).substring(2, 9) }];
+      
+      localStorage.setItem('scheduleEvents', JSON.stringify(events));
+    }
   };
 
-  // Filter events to show only this teacher's events
-  const teacherEvents = teacher
-    ? events.filter(event => event.teacherId === teacher.id)
-    : [];
-
   if (!teacher) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+        <div className="text-center p-4">
+          <h2 className="text-xl font-medium text-google-dark-gray mb-2">Loading...</h2>
+          <p className="text-google-gray">Please wait while we load your profile</p>
+        </div>
+      </div>
+    );
   }
 
   return (

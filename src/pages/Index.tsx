@@ -5,31 +5,45 @@ import CalendarView from './CalendarView';
 import { ScheduleEvent } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { getEvents } from '@/utils/supabaseClient';
+import { useQuery } from '@tanstack/react-query';
 
 const Index: React.FC = () => {
-  const [events, setEvents] = useState<ScheduleEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   
-  // Load all events from localStorage
+  // Use React Query to fetch events
+  const { data: events = [], isLoading, error } = useQuery({
+    queryKey: ['events'],
+    queryFn: getEvents
+  });
+  
+  // Handle errors
   useEffect(() => {
-    setLoading(true);
-    const storedEvents = localStorage.getItem('scheduleEvents');
-    if (storedEvents) {
-      try {
-        const parsedEvents = JSON.parse(storedEvents);
-        // Convert string dates to Date objects
-        const processedEvents = parsedEvents.map((event: any) => ({
-          ...event,
-          startDateTime: new Date(event.startDateTime),
-          endDateTime: new Date(event.endDateTime)
-        }));
-        setEvents(processedEvents);
-      } catch (error) {
-        console.error('Error parsing events:', error);
+    if (error) {
+      toast({
+        title: "Error loading events",
+        description: "Could not load events from the database. Showing local events instead.",
+        variant: "destructive"
+      });
+      
+      // Fallback to localStorage
+      const storedEvents = localStorage.getItem('scheduleEvents');
+      if (storedEvents) {
+        try {
+          const parsedEvents = JSON.parse(storedEvents);
+          // Convert string dates to Date objects
+          const processedEvents = parsedEvents.map((event: any) => ({
+            ...event,
+            startDateTime: new Date(event.startDateTime),
+            endDateTime: new Date(event.endDateTime)
+          }));
+        } catch (err) {
+          console.error('Error parsing local events:', err);
+        }
       }
     }
-    setLoading(false);
-  }, []);
+  }, [error, toast]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -44,7 +58,7 @@ const Index: React.FC = () => {
             </p>
           </div>
           
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-64 mb-6" />
               <Skeleton className="h-[500px] w-full rounded-md" />

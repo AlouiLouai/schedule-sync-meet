@@ -4,16 +4,21 @@ import { ScheduleEvent, Teacher } from '@/types';
 export interface ScheduleFormProps {
   title: string;
   description: string;
-  startDate: Date | undefined;
+  startDate?: Date;
   startTime: string;
   endTime: string;
   meetLink: string;
   isViewOnly?: boolean;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
-  onStartDateChange: (date: Date | undefined) => void;
+  onStartDateChange: (date?: Date) => void;
   onStartTimeChange: (value: string) => void;
   onEndTimeChange: (value: string) => void;
+  disabledDays?: {
+    before?: Date;
+    after?: Date;
+  };
+  isCreatingMeetLink?: boolean;
 }
 
 export interface ScheduleModalProps {

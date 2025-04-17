@@ -5,6 +5,7 @@ import { ScheduleEvent, Teacher, ViewMode } from '@/types';
 import { generateCalendarDays, generateWeekDays, getEventsForDate } from '@/utils/calendarUtils';
 import ScheduleModal from '@/components/schedule-modal/ScheduleModal';
 import ViewEventModal from '@/components/ViewEventModal';
+import DayEventsModal from '@/components/DayEventsModal';
 import CalendarHeader from '@/components/calendar/CalendarHeader';
 import MonthView from '@/components/calendar/MonthView';
 import WeekView from '@/components/calendar/WeekView';
@@ -30,16 +31,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const [modalType, setModalType] = useState<'add' | 'view'>('add');
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isDayEventsModalOpen, setIsDayEventsModalOpen] = useState(false);
 
   const monthDays = generateCalendarDays(currentDate);
   const weekDays = generateWeekDays(currentDate);
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
+    
     if (isTeacherView && teacher) {
       setModalType('add');
       setSelectedEvent(null);
       setIsModalOpen(true);
+    } else {
+      // For student view, show all events for the selected day
+      const eventsForDay = getEventsForDate(date, events);
+      if (eventsForDay.length > 0) {
+        setIsDayEventsModalOpen(true);
+      }
     }
   };
 
@@ -126,6 +135,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           isOpen={isViewModalOpen}
           onClose={() => setIsViewModalOpen(false)}
           event={selectedEvent}
+        />
+      )}
+      
+      {!isTeacherView && isDayEventsModalOpen && selectedDate && (
+        <DayEventsModal
+          isOpen={isDayEventsModalOpen}
+          onClose={() => setIsDayEventsModalOpen(false)}
+          selectedDate={selectedDate}
+          events={events}
+          onEventClick={handleEventClick}
         />
       )}
     </div>
