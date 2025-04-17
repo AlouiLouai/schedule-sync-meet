@@ -3,10 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { ScheduleEvent } from '@/types';
 
 // Initialize Supabase client (with fallback to localStorage if network is down)
-const supabaseUrl = 'https://bsrnelxbvfauvavmxqcu.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzcm5lbHhidmZhdXZhdm14cWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTE2MjY5MDMsImV4cCI6MjAwNzIwMjkwM30.A_jzkJ5NrVpOCRsWp-hfG3AyWRZbw-ChzOm_G1_YaJc';
+const supabaseUrl = 'https://wnkeqycrktmvgnulkvab.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indua2VxeWNya3RtdmdudWxrdmFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ4OTg3NDYsImV4cCI6MjA2MDQ3NDc0Nn0.nU-Bc-EBKAdrT9qQr6HEjaQoPN1QJSH98IWBi5jp7Jo';
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
+export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true
   },
