@@ -75,8 +75,17 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
                 mode="single"
                 selected={startDate}
                 onSelect={onStartDateChange}
-                disabled={disabledDays}
+                disabled={date => {
+                  if (disabledDays?.before && date < disabledDays.before) {
+                    return true;
+                  }
+                  if (disabledDays?.after && date > disabledDays.after) {
+                    return true;
+                  }
+                  return false;
+                }}
                 initialFocus
+                className="pointer-events-auto"
               />
             </PopoverContent>
           </Popover>

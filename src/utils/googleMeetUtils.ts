@@ -1,6 +1,4 @@
 
-import { google } from '@googleapis/calendar';
-import { OAuth2Client } from 'google-auth-library';
 import { generateMeetLink } from './calendarUtils';
 
 // This is a fallback implementation for when oauth isn't available or fails
