@@ -58,13 +58,13 @@ export const useGoogleAuth = (onLoginSuccess: (teacher: Teacher) => void): UseGo
       if (window.google?.accounts?.id) {
         try {
           window.google.accounts.id.initialize({
-            // Updated Google Client ID
+            // Use the confirmed Google Client ID
             client_id: '264480608260-b55o6itaj0pbsh35qiasdb51qlr1bubg.apps.googleusercontent.com',
             callback: handleGoogleResponse,
             auto_select: false,
             cancel_on_tap_outside: true,
-            // Use the modern behavior compatible with FedCM
-            use_fedcm_for_prompt: true
+            // Explicitly opt-in to FedCM
+            use_fedcm: true
           });
           
           setIsInitializing(false);
@@ -176,19 +176,41 @@ export const useGoogleAuth = (onLoginSuccess: (teacher: Teacher) => void): UseGo
     
     if (window.google?.accounts?.id) {
       try {
-        // Modern approach using the FedCM-compatible method
+        // Using the new FedCM-compatible method
         window.google.accounts.id.prompt((notification: any) => {
-          if (notification.isDisplayMoment?.()) {
-            console.log('Google Sign-In prompt is displayed');
+          // Don't rely on isDisplayMoment or isSkippedMoment for UI updates
+          // as these may not work in the future with FedCM
+          console.log('Google Sign-In prompt notification:', notification);
+          
+          // Check for other notification types that will still be available
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.log('Google Sign-In prompt was not displayed or was skipped');
+            setLoading(false);
+            
+            // If Google Sign-In prompt fails to display, fall back to demo login
+            if (notification.getNotDisplayedReason() || notification.getSkippedReason()) {
+              console.log('Reason:', 
+                notification.getNotDisplayedReason() || 
+                notification.getSkippedReason()
+              );
+              
+              toast({
+                title: "Google Sign-In Unavailable",
+                description: "Please try using demo login instead.",
+                variant: "destructive"
+              });
+            }
+          } else if (notification.isDismissedMoment()) {
+            console.log('Google Sign-In prompt was dismissed');
             setLoading(false);
           } else {
-            console.log('Google Sign-In prompt was not displayed', notification);
-            // If Google Sign-In prompt fails to display, fall back to demo login
-            handleDemoLogin();
+            // For other notification types, just log and continue
+            setLoading(false);
           }
         });
       } catch (error) {
         console.error('Error with Google prompt:', error);
+        setLoading(false);
         handleDemoLogin();
       }
     } else {
@@ -245,3 +267,4 @@ declare global {
     };
   }
 }
+
