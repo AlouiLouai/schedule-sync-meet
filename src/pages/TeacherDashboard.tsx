@@ -45,13 +45,15 @@ const TeacherDashboard: React.FC = () => {
     enabled: !!teacher, // Only run query when teacher is loaded
     retry: 2, // Retry failed requests twice
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    onError: (err) => {
-      console.error('Error fetching events in dashboard:', err);
-      toast({
-        title: "Could not load events",
-        description: "Using locally cached events if available.",
-        variant: "destructive"
-      });
+    meta: {
+      onError: (err: Error) => {
+        console.error('Error fetching events in dashboard:', err);
+        toast({
+          title: "Could not load events",
+          description: "Using locally cached events if available.",
+          variant: "destructive"
+        });
+      }
     }
   });
 

@@ -1,245 +1,191 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { ScheduleEvent, Teacher } from '@/types';
+import { ScheduleEvent } from '@/types';
 
-// Supabase public URLs and keys are safe to be in the frontend code
-const supabaseUrl = 'https://bsrnelxbvfauvavmxqcu.supabase.co'; // Replace with your Supabase URL
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzcm5lbHhidmZhdXZhdm14cWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODI0MzYyNTYsImV4cCI6MTk5ODAxMjI1Nn0.SHOYLmBiWEVjFmeSxVLQgL4AG_v-jPYnCM2ZgNT7KiI'; // Replace with your Supabase anon key
+// Initialize Supabase client (with fallback to localStorage if network is down)
+const supabaseUrl = 'https://bsrnelxbvfauvavmxqcu.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzcm5lbHhidmZhdXZhdm14cWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTE2MjY5MDMsImV4cCI6MjAwNzIwMjkwM30.A_jzkJ5NrVpOCRsWp-hfG3AyWRZbw-ChzOm_G1_YaJc';
 
-// Create supabase client with additional options
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: true
   },
   global: {
     fetch: (...args) => {
-      // Using timeout to prevent hanging connections
-      const controller = new AbortController();
-      const signal = controller.signal;
-      
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
-      
-      return fetch(...args, { signal })
-        .finally(() => clearTimeout(timeoutId));
+      // Set a timeout for fetch requests to prevent long hanging requests
+      const [resource, config] = args;
+      return fetch(resource, { 
+        ...config, 
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
     }
   }
 });
 
-// Local storage keys
-const EVENTS_STORAGE_KEY = 'scheduleEvents';
-const TEACHERS_STORAGE_KEY = 'cachedTeachers';
-
-// Helper function to get data from localStorage
-const getLocalData = (key: string) => {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
-  } catch (e) {
-    console.error(`Error reading from localStorage (${key}):`, e);
-    return null;
-  }
-};
-
-// Helper function to save data to localStorage
-const saveLocalData = (key: string, data: any) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-    return true;
-  } catch (e) {
-    console.error(`Error saving to localStorage (${key}):`, e);
-    return false;
-  }
-};
-
-// Teachers
-export const getTeachers = async (): Promise<Teacher[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('teachers')
-      .select('*');
-    
-    if (error) {
-      throw error;
-    }
-    
-    // Cache the results in localStorage
-    saveLocalData(TEACHERS_STORAGE_KEY, data);
-    return data as Teacher[];
-  } catch (error) {
-    console.error('Error fetching teachers:', error);
-    
-    // Fall back to cached data if available
-    const cachedTeachers = getLocalData(TEACHERS_STORAGE_KEY);
-    if (cachedTeachers) {
-      console.log('Using cached teacher data');
-      return cachedTeachers;
-    }
-    
-    return [];
-  }
-};
-
-// Events
+// Get all events from the database
 export const getEvents = async (): Promise<ScheduleEvent[]> => {
   try {
+    console.log("Fetching events from Supabase...");
     const { data, error } = await supabase
       .from('events')
       .select('*');
-    
+
     if (error) {
       throw error;
     }
+
+    console.log("Events fetched successfully:", data);
     
-    // Process and cache the results
-    const processedEvents = data.map((event: any) => ({
+    // Convert string dates to Date objects
+    return data.map((event: any) => ({
       ...event,
       startDateTime: new Date(event.startDateTime),
       endDateTime: new Date(event.endDateTime)
     }));
-    
-    saveLocalData(EVENTS_STORAGE_KEY, data);
-    return processedEvents;
   } catch (error) {
-    console.error('Error fetching events:', error);
+    console.error("Error fetching events:", error);
     
-    // Fall back to localStorage if available
-    const cachedEvents = getLocalData(EVENTS_STORAGE_KEY);
+    // Try to get events from localStorage as fallback
+    const cachedEvents = localStorage.getItem('cachedEvents');
     if (cachedEvents) {
-      console.log('Using cached event data');
-      return cachedEvents.map((event: any) => ({
-        ...event,
-        startDateTime: new Date(event.startDateTime),
-        endDateTime: new Date(event.endDateTime)
-      }));
+      try {
+        const parsedEvents = JSON.parse(cachedEvents);
+        // Convert string dates to Date objects
+        return parsedEvents.map((event: any) => ({
+          ...event,
+          startDateTime: new Date(event.startDateTime),
+          endDateTime: new Date(event.endDateTime)
+        }));
+      } catch (parseError) {
+        console.error("Error parsing cached events:", parseError);
+      }
     }
     
+    // If all else fails, return empty array
     return [];
   }
 };
 
-export const createEvent = async (event: Partial<ScheduleEvent>): Promise<ScheduleEvent | null> => {
+// Create a new event
+export const createEvent = async (event: Partial<ScheduleEvent>): Promise<ScheduleEvent> => {
   try {
+    // Format dates to ISO strings for Supabase
+    const formattedEvent = {
+      ...event,
+      startDateTime: event.startDateTime?.toISOString(),
+      endDateTime: event.endDateTime?.toISOString()
+    };
+
     const { data, error } = await supabase
       .from('events')
-      .insert([event])
+      .insert([formattedEvent])
       .select()
       .single();
-    
+
     if (error) {
       throw error;
     }
-    
-    const processedEvent = {
+
+    // Store in localStorage as backup
+    const allEvents = await getEvents();
+    localStorage.setItem('cachedEvents', JSON.stringify(allEvents));
+
+    // Convert string dates back to Date objects
+    return {
       ...data,
       startDateTime: new Date(data.startDateTime),
       endDateTime: new Date(data.endDateTime)
     };
-    
-    // Update local cache
-    const cachedEvents = getLocalData(EVENTS_STORAGE_KEY) || [];
-    saveLocalData(EVENTS_STORAGE_KEY, [...cachedEvents, data]);
-    
-    return processedEvent;
   } catch (error) {
-    console.error('Error creating event:', error);
+    console.error("Error creating event:", error);
     
-    // Fallback to localStorage if database fails
-    const storedEvents = getLocalData(EVENTS_STORAGE_KEY) || [];
-    const newEvent = { 
-      ...event, 
-      id: event.id || Math.random().toString(36).substring(2, 9),
-      created_at: new Date().toISOString()
-    };
+    // Fallback to localStorage
+    const cachedEvents = localStorage.getItem('cachedEvents');
+    let events = [];
     
-    storedEvents.push(newEvent);
-    saveLocalData(EVENTS_STORAGE_KEY, storedEvents);
+    if (cachedEvents) {
+      try {
+        events = JSON.parse(cachedEvents);
+      } catch (e) {
+        events = [];
+      }
+    }
     
-    return {
-      ...newEvent,
-      startDateTime: new Date(newEvent.startDateTime as string),
-      endDateTime: new Date(newEvent.endDateTime as string)
+    // Generate a unique ID
+    const newId = `local-${Date.now()}`;
+    const newEvent = {
+      ...event,
+      id: newId,
     } as ScheduleEvent;
+    
+    events.push(newEvent);
+    localStorage.setItem('cachedEvents', JSON.stringify(events));
+    
+    return newEvent;
   }
 };
 
-export const updateEvent = async (event: Partial<ScheduleEvent>): Promise<ScheduleEvent | null> => {
+// Update an existing event
+export const updateEvent = async (event: Partial<ScheduleEvent>): Promise<ScheduleEvent> => {
   try {
+    if (!event.id) {
+      throw new Error('Event ID is required for update');
+    }
+
+    // Format dates to ISO strings for Supabase
+    const formattedEvent = {
+      ...event,
+      startDateTime: event.startDateTime ? event.startDateTime.toISOString() : undefined,
+      endDateTime: event.endDateTime ? event.endDateTime.toISOString() : undefined
+    };
+
     const { data, error } = await supabase
       .from('events')
-      .update(event)
+      .update(formattedEvent)
       .eq('id', event.id)
       .select()
       .single();
-    
+
     if (error) {
       throw error;
     }
-    
-    const processedEvent = {
+
+    // Update localStorage backup
+    const allEvents = await getEvents();
+    localStorage.setItem('cachedEvents', JSON.stringify(allEvents));
+
+    // Convert string dates back to Date objects
+    return {
       ...data,
       startDateTime: new Date(data.startDateTime),
       endDateTime: new Date(data.endDateTime)
     };
-    
-    // Update local cache
-    const cachedEvents = getLocalData(EVENTS_STORAGE_KEY) || [];
-    const updatedCache = cachedEvents.map((e: any) => 
-      e.id === event.id ? { ...e, ...event } : e
-    );
-    saveLocalData(EVENTS_STORAGE_KEY, updatedCache);
-    
-    return processedEvent;
   } catch (error) {
-    console.error('Error updating event:', error);
+    console.error("Error updating event:", error);
     
-    // Fallback to localStorage if database fails
-    const storedEvents = getLocalData(EVENTS_STORAGE_KEY) || [];
-    const updatedEvents = storedEvents.map((e: any) => 
-      e.id === event.id ? { ...e, ...event, updated_at: new Date().toISOString() } : e
-    );
+    // Fallback to localStorage
+    const cachedEvents = localStorage.getItem('cachedEvents');
     
-    saveLocalData(EVENTS_STORAGE_KEY, updatedEvents);
-    
-    const updatedEvent = updatedEvents.find((e: any) => e.id === event.id);
-    if (updatedEvent) {
-      return {
-        ...updatedEvent,
-        startDateTime: new Date(updatedEvent.startDateTime),
-        endDateTime: new Date(updatedEvent.endDateTime)
-      } as ScheduleEvent;
+    if (cachedEvents) {
+      try {
+        let events = JSON.parse(cachedEvents);
+        const eventIndex = events.findIndex((e: any) => e.id === event.id);
+        
+        if (eventIndex !== -1) {
+          events[eventIndex] = {
+            ...events[eventIndex],
+            ...event
+          };
+          
+          localStorage.setItem('cachedEvents', JSON.stringify(events));
+          return events[eventIndex] as ScheduleEvent;
+        }
+      } catch (e) {
+        console.error("Error updating cached event:", e);
+      }
     }
     
-    return null;
-  }
-};
-
-export const deleteEvent = async (id: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      throw error;
-    }
-    
-    // Update local cache
-    const cachedEvents = getLocalData(EVENTS_STORAGE_KEY) || [];
-    const updatedCache = cachedEvents.filter((e: any) => e.id !== id);
-    saveLocalData(EVENTS_STORAGE_KEY, updatedCache);
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting event:', error);
-    
-    // Fallback to localStorage if database fails
-    const storedEvents = getLocalData(EVENTS_STORAGE_KEY) || [];
-    const updatedEvents = storedEvents.filter((e: any) => e.id !== id);
-    
-    saveLocalData(EVENTS_STORAGE_KEY, updatedEvents);
-    
-    return true;
+    // If we can't update, return the original event
+    return event as ScheduleEvent;
   }
 };
