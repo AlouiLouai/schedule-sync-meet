@@ -27,29 +27,63 @@ const TeacherLogin: React.FC = () => {
   useEffect(() => {
     // Load the Google API client
     const loadGoogleScript = () => {
+      const existingScript = document.getElementById('google-gsi-client');
+      if (existingScript) {
+        // If script already exists, initialize directly
+        initializeGoogleAuth();
+        return;
+      }
+
       const script = document.createElement('script');
+      script.id = 'google-gsi-client';
       script.src = 'https://accounts.google.com/gsi/client';
       script.async = true;
       script.defer = true;
       script.onload = initializeGoogleAuth;
+      script.onerror = () => {
+        console.error('Failed to load Google Identity Services script');
+        setIsInitializing(false);
+        toast({
+          title: "Google Sign-In Unavailable",
+          description: "Could not load Google authentication services. Please try again later or use demo login.",
+          variant: "destructive"
+        });
+      };
       document.body.appendChild(script);
     };
 
     const initializeGoogleAuth = () => {
-      // Check if Google One Tap API is loaded properly
+      // Check if Google Identity Services API is loaded properly
       if (window.google?.accounts?.id) {
-        window.google.accounts.id.initialize({
-          // Real Google Client ID - you need to replace this with your actual Google OAuth client ID
-          client_id: '377859050326-99n84huq8lkvkf12tuohg70lcd5qm4sg.apps.googleusercontent.com',
-          callback: handleGoogleResponse,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
-        
-        setIsInitializing(false);
+        try {
+          window.google.accounts.id.initialize({
+            // Updated Google Client ID
+            client_id: '264480608260-b55o6itaj0pbsh35qiasdb51qlr1bubg.apps.googleusercontent.com',
+            callback: handleGoogleResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+            // Use the modern behavior compatible with FedCM
+            use_fedcm_for_prompt: true
+          });
+          
+          setIsInitializing(false);
+        } catch (error) {
+          console.error('Error initializing Google Identity Services:', error);
+          setIsInitializing(false);
+          toast({
+            title: "Authentication Error",
+            description: "There was a problem initializing Google Sign-In.",
+            variant: "destructive"
+          });
+        }
       } else {
-        console.error('Google One Tap API failed to load properly');
+        console.error('Google Identity Services failed to load properly');
         setIsInitializing(false);
+        toast({
+          title: "Google Sign-In Unavailable",
+          description: "Could not initialize Google authentication services. Try again later.",
+          variant: "destructive"
+        });
       }
     };
 
@@ -61,7 +95,7 @@ const TeacherLogin: React.FC = () => {
         window.google.accounts.id.cancel();
       }
     };
-  }, []);
+  }, [toast]);
 
   const handleGoogleResponse = (response: any) => {
     console.log('Google response received:', response);
@@ -137,16 +171,18 @@ const TeacherLogin: React.FC = () => {
   const handleLoginClick = () => {
     setLoading(true);
     
-    if (window.google?.accounts.id) {
-      // Show the Google One Tap prompt
+    if (window.google?.accounts?.id) {
       try {
+        // Modern approach using the FedCM-compatible method
+        // This replaces the deprecated notification.isNotDisplayed() and notification.isSkippedMoment()
         window.google.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            console.log('Google One Tap was not displayed:', notification);
-            // Fallback to the demo login if Google One Tap fails
-            handleDemoLogin();
-          } else {
+          if (notification.isDisplayMoment?.()) {
+            console.log('Google Sign-In prompt is displayed');
             setLoading(false);
+          } else {
+            console.log('Google Sign-In prompt was not displayed', notification);
+            // If Google Sign-In prompt fails to display, fall back to demo login
+            handleDemoLogin();
           }
         });
       } catch (error) {

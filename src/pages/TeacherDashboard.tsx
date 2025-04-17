@@ -21,18 +21,38 @@ const TeacherDashboard: React.FC = () => {
     const storedTeacher = localStorage.getItem('teacherInfo');
     
     if (storedTeacher) {
-      setTeacher(JSON.parse(storedTeacher));
+      try {
+        setTeacher(JSON.parse(storedTeacher));
+      } catch (error) {
+        console.error('Error parsing teacher info:', error);
+        navigate('/teacher-login');
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again.",
+          variant: "destructive"
+        });
+      }
     } else {
       // No teacher info found, redirect to login
       navigate('/teacher-login');
     }
-  }, [navigate]);
+  }, [navigate, toast]);
 
   // Fetch events for this teacher
-  const { data: allEvents = [], isLoading } = useQuery({
+  const { data: allEvents = [], isLoading, error } = useQuery({
     queryKey: ['events'],
     queryFn: getEvents,
-    enabled: !!teacher // Only run query when teacher is loaded
+    enabled: !!teacher, // Only run query when teacher is loaded
+    retry: 2, // Retry failed requests twice
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    onError: (err) => {
+      console.error('Error fetching events in dashboard:', err);
+      toast({
+        title: "Could not load events",
+        description: "Using locally cached events if available.",
+        variant: "destructive"
+      });
+    }
   });
 
   // Filter events to show only this teacher's events
@@ -45,6 +65,14 @@ const TeacherDashboard: React.FC = () => {
     mutationFn: createEvent,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+    onError: (error) => {
+      console.error('Error creating event:', error);
+      toast({
+        title: "Could not save to database",
+        description: "Your event was saved locally.",
+        variant: "destructive"
+      });
     }
   });
 
@@ -52,6 +80,14 @@ const TeacherDashboard: React.FC = () => {
     mutationFn: updateEvent,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+    onError: (error) => {
+      console.error('Error updating event:', error);
+      toast({
+        title: "Could not update in database",
+        description: "Your changes were saved locally.",
+        variant: "destructive"
+      });
     }
   });
 
@@ -97,16 +133,6 @@ const TeacherDashboard: React.FC = () => {
         description: "Failed to save your schedule. Please try again.",
         variant: "destructive"
       });
-      
-      // Fallback to localStorage if database fails
-      const storedEvents = localStorage.getItem('scheduleEvents') || '[]';
-      let events = JSON.parse(storedEvents);
-      
-      events = event.id
-        ? events.map((e: ScheduleEvent) => e.id === event.id ? newEvent : e)
-        : [...events, { ...newEvent, id: Math.random().toString(36).substring(2, 9) }];
-      
-      localStorage.setItem('scheduleEvents', JSON.stringify(events));
     }
   };
 
@@ -138,6 +164,14 @@ const TeacherDashboard: React.FC = () => {
               Manage your classes and online sessions in one place
             </p>
           </div>
+          
+          {error ? (
+            <div className="p-4 mb-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-yellow-800">
+                There was a problem connecting to the database. You're currently working with locally cached data.
+              </p>
+            </div>
+          ) : null}
           
           <CalendarView 
             events={teacherEvents} 
