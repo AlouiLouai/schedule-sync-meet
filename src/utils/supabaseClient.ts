@@ -8,15 +8,22 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
-    persistSession: true
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
   },
   global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-web/2.5.0',
+    },
     fetch: (...args) => {
       // Set a timeout for fetch requests to prevent long hanging requests
       const [resource, config] = args;
       return fetch(resource, { 
         ...config, 
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(15000), // 15 second timeout
+        mode: 'cors', // Explicitly set CORS mode
+        credentials: 'same-origin'
       });
     }
   }

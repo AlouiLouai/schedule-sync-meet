@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Teacher } from "@/types";
@@ -84,40 +85,20 @@ export const useGoogleAuth = (
     const initializeGoogleAuth = () => {
       if (window.google?.accounts?.id) {
         try {
+          // FedCM configuration for Google Identity
           window.google.accounts.id.initialize({
             client_id:
               "264480608260-b55o6itaj0pbsh35qiasdb51qlr1bubg.apps.googleusercontent.com",
             ux_mode: "popup",
-            auto_select: true,
+            auto_select: false, // Don't auto-select to avoid prompting on page load
             cancel_on_tap_outside: true,
+            callback: handleGoogleResponse,
+            // Explicit FedCM opt-in to address warnings
             use_fedcm_for_prompt: true,
             use_fedcm_for_button: true,
-            button_auto_select: true,
-            debug_mode: true,
-            callback: async (response) => {
-              const credential = response.credential;
-
-              const { data, error } = await supabase.auth.signInWithIdToken({
-                provider: "google",
-                token: credential,
-              });
-
-              if (error) {
-                console.error("Supabase login failed:", error);
-                toast({
-                  title: "Login Failed",
-                  description: "There was a problem signing in with Google.",
-                  variant: "destructive",
-                });
-                return;
-              }
-
-              console.log("✅ Supabase login success:", data);
-              toast({
-                title: "Logged In",
-                description: "Welcome back!",
-              });
-            },
+            fedcm_account_fetch_delay_ms: 1000,
+            fedcm_auto_sync_delay_ms: 1000,
+            debug_mode: false, // Set to false in production
           });
 
           setIsInitializing(false);
@@ -233,41 +214,47 @@ export const useGoogleAuth = (
 
     if (window.google?.accounts?.id) {
       try {
-        window.google.accounts.id.prompt((notification: any) => {
-          const momentType = notification.getMomentType();
-
-          console.log("Google Sign-In prompt notification:", notification);
-          console.log("Moment type:", momentType);
-
-          switch (momentType) {
-            case "skipped":
-              console.warn("Google Sign-In prompt was skipped");
-              toast({
-                title: "Google Sign-In Skipped",
-                description:
-                  "It looks like the sign-in prompt was skipped. Please try again or use demo login.",
-                variant: "destructive",
-              });
-              break;
-
-            case "dismissed":
-              console.warn("Google Sign-In prompt was dismissed by the user");
-              break;
-
-            case "displayed":
-              console.log("Google Sign-In prompt was displayed");
-              break;
-
-            default:
-              console.log("Unhandled prompt moment:", momentType);
-              break;
+        // FedCM-compliant approach - don't rely on prompt notification callbacks
+        window.google.accounts.id.prompt((result) => {
+          console.log("Google Sign-In prompt result:", result);
+          
+          // The FedCM API doesn't provide detailed moment types anymore
+          // Just check if sign-in was completed based on result
+          if (result.isDisplayed() === false) {
+            console.log("Google Sign-In prompt was not displayed");
+            toast({
+              title: "Sign-In Not Available",
+              description: "Please try again or use demo login.",
+              variant: "destructive",
+            });
+            setLoading(false);
+          } else if (result.isSkipped()) {
+            console.log("Google Sign-In was skipped by the user");
+            // Let the user know they can try again or use demo login
+            toast({
+              title: "Sign-In Skipped",
+              description: "You can try again or use demo login.",
+              variant: "destructive",
+            });
+            setLoading(false);
+          } else if (result.isDismissed()) {
+            console.log("Google Sign-In was dismissed by the user");
+            setLoading(false);
+          } else {
+            // Result will be handled by the callback specified in initialize()
+            console.log("Google Sign-In prompt was shown to the user");
+            // Don't set loading to false here as the callback will handle it
           }
-
-          setLoading(false);
         });
       } catch (error) {
         console.error("Error with Google prompt:", error);
         setLoading(false);
+        // Fallback to demo login in case of error
+        toast({
+          title: "Google Sign-In Error",
+          description: "Falling back to demo login mode.",
+          variant: "destructive",
+        });
         handleDemoLogin();
       }
     } else {
